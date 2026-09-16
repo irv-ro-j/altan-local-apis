@@ -38,18 +38,21 @@ declare global { var __altanLocalSims: MockSim[] | undefined }
 function cloneFixtures() { return structuredClone(initialSims) }
 export function getSims() { return globalThis.__altanLocalSims ??= cloneFixtures() }
 export function resetSims() { globalThis.__altanLocalSims = cloneFixtures(); return getSims() }
-// Cualquier MSISDN fuera de las fixtures se autoprovisiona como Active, para no bloquear flujos acoplados a sistemas externos que no controlamos.
-function provisionSim(msisdn: string): MockSim {
+// Cualquier MSISDN fuera de las fixtures se autoprovisiona en el status que la operación solicitada necesita (Idle para preactivar/activar, Active para recargar/cambiar plan/consumir), en vez de un status fijo que bloquee unas u otras.
+function provisionSim(msisdn: string, status: 'Idle' | 'Active'): MockSim {
+  if (status === 'Idle') {
+    return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: '', status: 'Idle', label: 'Inactiva', description: 'SIM autoprovisionada (LOCAL mock)', offerId: OFFER_CODES.IDLE, benefits: [], operations: [] }
+  }
   const offerId = OFFER_CODES.MULTI
   return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: `35${msisdn}0`, status: 'Active', label: 'Activa', description: 'SIM autoprovisionada (LOCAL mock)', offerId, benefits: primaryBenefits(offerId), operations: [] }
 }
-export function requireSim(msisdn: string) {
+export function requireSim(msisdn: string, autoProvisionStatus: 'Idle' | 'Active' = 'Active') {
   if (msisdn === '5550000099') throw createError({ statusCode: 404, data: { errorCode: '1211000305', message: 'Subscriber not found' } })
   if (msisdn === '5550000098') throw createError({ statusCode: 500, data: { errorCode: 'LOCAL_500', message: 'Simulated Altán error' } })
   const sims = getSims()
   let sim = sims.find(item => item.msisdn === msisdn)
   if (!sim) {
-    sim = provisionSim(msisdn)
+    sim = provisionSim(msisdn, autoProvisionStatus)
     sims.push(sim)
   }
   return sim
