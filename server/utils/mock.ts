@@ -60,6 +60,13 @@ export function requireSim(msisdn: string, autoProvisionStatus: 'Idle' | 'Active
 export function activatePlan(sim: MockSim, offeringId: string, operation: 'activate' | 'preregister') { sim.status = 'Active'; sim.offerId = offeringId; sim.benefits = primaryBenefits(offeringId); sim.operations.push({ type: operation, offeringId, at: dateFormat(new Date()) }) }
 export function purchasePackage(sim: MockSim, offeringId: string) { sim.benefits.push(purchasedDataBenefit(offeringId)); sim.operations.push({ type: 'purchase', offeringId, at: dateFormat(new Date()) }) }
 export function changePlan(sim: MockSim, offeringId: string) { sim.offerId = offeringId; sim.benefits = primaryBenefits(offeringId); sim.operations.push({ type: 'change_offer', offeringId, at: dateFormat(new Date()) }) }
+export function portIn(sim: MockSim, portedMsisdn: string) {
+  const existing = getSims().find(item => item.msisdn === portedMsisdn)
+  if (existing && existing !== sim) throw createError({ statusCode: 409, data: { errorCode: 'LOCAL_PORT_IN_CONFLICT', message: 'The ported MSISDN already exists.' } })
+  sim.msisdn = portedMsisdn
+  sim.operations.push({ type: 'port_in', at: dateFormat(new Date()) })
+  return { msisdnPorted: portedMsisdn, effectiveDate: dateFormat(new Date()) }
+}
 export function consumeBenefits(sim: MockSim, usage = { data: 250, voice: 60, sms: 20 }) {
   const kinds = [{ marker: 'DATA', amount: usage.data }, { marker: 'MIN', amount: usage.voice }, { marker: 'SMS', amount: usage.sms }]
   for (const kind of kinds) {

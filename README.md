@@ -20,6 +20,7 @@ El portal y la API quedan disponibles en `http://localhost:3000`.
 | Preactivación | POST | `/cm/v1/subscribers/{msisdn}/preregistered` |
 | Compra/recarga | POST | `/cm/v1/products/purchase` |
 | Cambio de plan | PATCH | `/cm/v1/subscribers/{msisdn}` |
+| Portabilidad entrante | POST | `/ac/v1/msisdns/port-in-c` |
 
 El endpoint de token exige Basic Auth correcto. Las rutas operativas exigen el Bearer emitido. Copia `.env.example` a `.env` para cambiar los valores; si no existe `.env`, los valores predeterminados son `local-crm`, `local-secret-change-me` y `local-altan-access-token`.
 
@@ -51,5 +52,7 @@ Los cambios se mantienen únicamente en memoria. Activación y preactivación ca
 - `POST /api/mock/reset`
 
 ## Conexión desde CRM
+
+Para el endpoint de portabilidad, configura `ALTAN_LOCAL_API_BASE_URL` en el CRM (por defecto, `http://localhost:3000`).
 
 Selecciona el ambiente `LOCAL` —una vez incorporado en el CRM— y utiliza la misma URL base para construir las seis rutas anteriores. Si CRM corre en Docker, `localhost` debe referirse al contenedor que expone este servicio; normalmente se requiere el nombre de servicio Docker o `host.docker.internal`.
