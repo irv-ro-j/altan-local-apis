@@ -51,8 +51,9 @@ Los cambios se mantienen únicamente en memoria. Activación y preactivación ca
 - `POST /api/mock/sims/{msisdn}/consume` — consume 250 MB, 60 minutos y 20 SMS.
 - `POST /api/mock/reset`
 
-## Conexión desde CRM
+## Uso desde CRM
 
-Para el endpoint de portabilidad, configura `ALTAN_LOCAL_API_BASE_URL` en el CRM (por defecto, `http://localhost:3000`).
-
-Selecciona el ambiente `LOCAL` —una vez incorporado en el CRM— y utiliza la misma URL base para construir las seis rutas anteriores. Si CRM corre en Docker, `localhost` debe referirse al contenedor que expone este servicio; normalmente se requiere el nombre de servicio Docker o `host.docker.internal`.
+El CRM usa actualmente el mock remoto de Amplify para todas las operaciones
+del ambiente `LOCAL`, incluida la portabilidad. Este simulador se conserva para
+pruebas locales directas y para una futura migración integral; no requiere
+configuración adicional en el CRM mientras se mantenga esa estrategia.
