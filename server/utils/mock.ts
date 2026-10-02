@@ -35,6 +35,18 @@ const initialSims: MockSim[] = [
   // Un Idle real de Altán sí trae offeringId (oferta base sin plan, ver RequestLog id 16107/15962/15559: siempre "1000001051") pero sin IMEI ni freeUnits
 ].map(([msisdn, status, label, description], index) => ({ msisdn, status, label, description, iccid: `89521400000000000${String(index + 1).padStart(2, '0')}`, imsi: `3341400000000${String(index + 1).padStart(2, '0')}`, imei: status === 'Idle' ? '' : `3500000000000${String(index + 1).padStart(2, '0')}`, offerId: status === 'Idle' ? OFFER_CODES.IDLE : OFFER_CODES.MULTI, benefits: status === 'Active' ? primaryBenefits(OFFER_CODES.MULTI) : [], operations: [] })) as MockSim[]
 declare global { var __altanLocalSims: MockSim[] | undefined }
+// Catálogo de estados disponibles, derivado de las fixtures para no duplicar status/label.
+export const STATUS_OPTIONS = initialSims.map(({ status, label, description }) => ({ status, label, description }))
+export const MSISDN_PATTERN = /^\d{10}$/
+export function addSim(msisdn: string, status: string): MockSim {
+  const option = STATUS_OPTIONS.find(item => item.status === status)
+  if (!option) throw createError({ statusCode: 400, data: { message: `Estado inválido: ${status}` } })
+  const idle = status === 'Idle'
+  const offerId = idle ? OFFER_CODES.IDLE : OFFER_CODES.MULTI
+  const sim: MockSim = { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: idle ? '' : `35${msisdn}0`, status, label: option.label, description: `${option.description} (alta manual)`, offerId, benefits: status === 'Active' ? primaryBenefits(offerId) : [], operations: [] }
+  getSims().push(sim)
+  return sim
+}
 function cloneFixtures() { return structuredClone(initialSims) }
 export function getSims() { return globalThis.__altanLocalSims ??= cloneFixtures() }
 export function resetSims() { globalThis.__altanLocalSims = cloneFixtures(); return getSims() }
