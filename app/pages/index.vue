@@ -17,10 +17,12 @@ async function addSims() {
     addError.value = error?.data?.data?.message || error?.data?.message || 'No se pudieron agregar las SIMs.'
   } finally { adding.value = false }
 }
+const { data: conectyPackages } = await useFetch<{ intId: number, plan: string, price: number, specialPrice: number, currency: string, region: string }[]>('/api/mock/conecty/packages')
+const { data: conectySales, refresh: refreshConectySales } = await useFetch<{ id: string, identifier: string, packageId: number, createdAt: string }[]>('/api/mock/conecty/sales')
 const copied = ref(false)
 const consuming = ref<string | null>(null)
 async function copyBaseUrl() { await navigator.clipboard.writeText('http://localhost:3000'); copied.value = true; setTimeout(() => { copied.value = false }, 1800) }
-async function resetFixtures() { await $fetch('/api/mock/reset', { method: 'POST' }); await refresh() }
+async function resetFixtures() { await $fetch('/api/mock/reset', { method: 'POST' }); await Promise.all([refresh(), refreshConectySales()]) }
 async function consumeBalance(msisdn: string) { consuming.value = msisdn; try { await $fetch(`/api/mock/sims/${msisdn}/consume`, { method: 'POST' }); await refresh() } finally { consuming.value = null } }
 useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador local de operaciones Altán para CRM.' })
 </script>
@@ -96,6 +98,37 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
       </div>
       <div><b class="post">POST</b><code>/cm/v1/products/purchase</code><span>Compra / recarga</span></div>
       <div><b class="patch">PATCH</b><code>/cm/v1/subscribers/{msisdn}</code><span>Cambio de plan</span></div>
+    </div>
+  </section>
+  <section id="conecty" class="content-section endpoints">
+    <p class="eyebrow">Conecty · eSIMs de viaje</p>
+    <h2>API de Conecty simulada</h2>
+    <p class="section-intro">En el CRM, Integradores &gt; Conecty, elige el ambiente <code>LOCAL</code> y usa las credenciales
+      de <code>.env</code> (por defecto <code>local-document</code> / <code>local-conecty-key</code>).</p>
+    <div class="endpoint-list">
+      <div><b class="get">GET</b><code>/users/login?document=</code><span>Token (header x-api-key)</span></div>
+      <div><b class="get">GET</b><code>/api/packages</code><span>Catálogo básico</span></div>
+      <div><b class="post">POST</b><code>/api/packages</code><span>Catálogo detallado</span></div>
+      <div><b class="post">POST</b><code>/api/sales</code><span>Crear venta (idempotente)</span></div>
+      <div><b class="get">GET</b><code>/api/sales?sale_id=</code><span>Detalle de eSIM</span></div>
+      <div><b class="get">GET</b><code>/api/sales/history?sale_identifier=</code><span>Buscar por referencia</span></div>
+    </div>
+    <div class="section-heading">
+      <h2>Paquetes ({{ conectyPackages?.length || 0 }})</h2>
+    </div>
+    <div class="sim-grid">
+      <article v-for="item in conectyPackages" :key="item.intId" class="sim-card">
+        <div class="sim-card-top">{{ item.plan }}</div><code>{{ item.intId }}</code>
+        <p>{{ item.region }} · {{ item.currency }} {{ item.price }} (distribuidor {{ item.specialPrice }})</p>
+      </article>
+    </div>
+    <div class="section-heading">
+      <h2>Ventas simuladas ({{ conectySales?.length || 0 }})</h2>
+      <button class="quiet-button" type="button" @click="refreshConectySales()">Actualizar</button>
+    </div>
+    <p v-if="!conectySales?.length" class="section-intro">Aún no hay ventas. Se crean cuando el CRM despacha una orden con producto Conecty.</p>
+    <div v-else class="endpoint-list">
+      <div v-for="sale in conectySales" :key="sale.id"><code>{{ sale.id }}</code><code>{{ sale.identifier || 'sin referencia' }}</code><span>Paquete {{ sale.packageId }}</span></div>
     </div>
   </section>
   <section id="uso" class="content-section setup">
