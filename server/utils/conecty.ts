@@ -39,14 +39,15 @@ export const getSales = () => globalThis.__conectyLocalSales ??= []
 export const resetSales = () => { globalThis.__conectyLocalSales = []; return getSales() }
 
 export function createSale (packageId: number, identifier: string): ConectySale {
-  if (!PACKAGES.some(item => item.intId === packageId)) throw conectyError(404, `El paquete ${packageId} no existe.`)
+  if (!Number.isInteger(packageId) || packageId <= 0) throw conectyError(404, `El paquete ${packageId} no existe.`)
   const sale = { id: String(700000 + getSales().length + 1), identifier, packageId, createdAt: new Date().toISOString() }
   getSales().push(sale)
   return sale
 }
 
 export function saleDetail (sale: ConectySale) {
-  const item = PACKAGES.find(candidate => candidate.intId === sale.packageId)!
+  // IDs fuera del catálogo local (p. ej. importados del catálogo real) se simulan con un paquete genérico
+  const item = PACKAGES.find(candidate => candidate.intId === sale.packageId) ?? { intId: sale.packageId, plan: `Paquete ${sale.packageId} (simulado)` }
   const iccid = `8957000000${sale.id.padStart(9, '0')}`
   return {
     data: [{ sale_id: sale.id, iccid, product_id: item.intId, productName: item.plan, qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(`LPA:1$sm-dp-plus.local$LOCAL-${sale.id}`)}`, manualActivation: { activationCode: `LOCAL-${sale.id}`, addressSmDp: 'sm-dp-plus.local' } }],
