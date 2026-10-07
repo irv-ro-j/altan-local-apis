@@ -57,3 +57,18 @@ El CRM usa actualmente el mock remoto de Amplify para todas las operaciones
 del ambiente `LOCAL`, incluida la portabilidad. Este simulador se conserva para
 pruebas locales directas y para una futura migración integral; no requiere
 configuración adicional en el CRM mientras se mantenga esa estrategia.
+
+## Conecty (eSIMs de viaje)
+
+El simulador también expone la Conecty Sales API. En el CRM, en `Integradores > Conecty`, elige el ambiente **LOCAL**, captura `LOCAL URL base` (p. ej. `http://localhost:3000`) y las credenciales de `.env` (`CONECTY_LOCAL_DOCUMENT`, `CONECTY_LOCAL_API_KEY`; por defecto `local-document` y `local-conecty-key`).
+
+| Operación | Método | Ruta |
+| --- | --- | --- |
+| Login (token) | GET | `/users/login?document=` con header `x-api-key` |
+| Catálogo básico | GET | `/api/packages` |
+| Catálogo detallado | POST | `/api/packages` |
+| Crear venta (idempotente por `sale_identifier`) | POST | `/api/sales` |
+| Detalle de venta (eSIM, QR, SM-DP+) | GET | `/api/sales?sale_id=` |
+| Buscar venta por referencia | GET | `/api/sales/history?sale_identifier=` |
+
+El catálogo trae 6 paquetes de ejemplo (IDs `90001`–`90006`). Las ventas viven en memoria; `GET /api/mock/conecty/sales` las lista y `POST /api/mock/reset` las borra.

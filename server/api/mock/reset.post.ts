@@ -1,2 +1,4 @@
 import { resetSims } from '../../utils/mock'
-export default defineEventHandler(() => ({ reset: true, sims: resetSims().length }))
+import { resetSales } from '../../utils/conecty'
+
+export default defineEventHandler(() => { resetSales(); return { reset: true, sims: resetSims().length } })
