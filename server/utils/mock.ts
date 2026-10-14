@@ -58,11 +58,16 @@ function provisionSim(msisdn: string, status: 'Idle' | 'Active'): MockSim {
   const offerId = OFFER_CODES.MULTI
   return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: `35${msisdn}0`, status: 'Active', label: 'Activa', description: 'SIM autoprovisionada (LOCAL mock)', offerId, benefits: primaryBenefits(offerId), operations: [] }
 }
+// Consultar un perfil no debe crear ni modificar una SIM.
+export function findSim(msisdn: string): MockSim | undefined {
+  if (msisdn === '5550000098') throw createError({ statusCode: 500, data: { errorCode: 'LOCAL_500', message: 'Simulated Altán error' } })
+  if (msisdn === '5550000099') return undefined
+  return getSims().find(item => item.msisdn === msisdn)
+}
 export function requireSim(msisdn: string, autoProvisionStatus: 'Idle' | 'Active' = 'Active') {
   if (msisdn === '5550000099') throw createError({ statusCode: 404, data: { errorCode: '1211000305', message: 'Subscriber not found' } })
-  if (msisdn === '5550000098') throw createError({ statusCode: 500, data: { errorCode: 'LOCAL_500', message: 'Simulated Altán error' } })
   const sims = getSims()
-  let sim = sims.find(item => item.msisdn === msisdn)
+  let sim = findSim(msisdn)
   if (!sim) {
     sim = provisionSim(msisdn, autoProvisionStatus)
     sims.push(sim)
