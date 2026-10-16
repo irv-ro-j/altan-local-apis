@@ -1,7 +1,7 @@
-import { portIn, requireSim } from '../../../../utils/mock'
+import { portIn } from '../../../../utils/mock'
 import { ensureBearer, readPayload } from '../../../../utils/request'
 
-/** Mock local de Altán AC port-in-c. No tiene efectos fuera de memoria. */
+/** Simulates Altán AC port-in-c without calling the operator. */
 export default defineEventHandler(async (event) => {
   ensureBearer(event)
   const body = await readPayload(event)
@@ -18,9 +18,5 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, data: { errorCode: 'LOCAL_PORT_IN_500', message: 'Simulated port-in server error.' } })
   }
 
-  const sim = requireSim(transitory)
-  if (sim.status !== 'Active') {
-    throw createError({ statusCode: 409, data: { errorCode: 'LOCAL_PORT_IN_NOT_ACTIVE', message: 'Port-in requires an Active transitory SIM.' } })
-  }
-  return portIn(sim, ported)
+  return await portIn(transitory, ported)
 })

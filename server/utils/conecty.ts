@@ -1,3 +1,7 @@
+import { createHash, randomInt } from 'node:crypto'
+import { getStore } from './runtime-storage'
+import type { Entry } from '../lib/storage'
+
 declare const process: { env: Record<string, string | undefined> }
 
 export type ConectyPackage = { intId: number, plan: string, price: number, specialPrice: number, currency: string, coverage_type: string, plan_type: string, coverage: string, coverage_codes: string, region: string, days: number, gb_capacity: string }
@@ -5,7 +9,7 @@ export type ConectySale = { id: string, identifier: string, packageId: number, c
 
 const defaults = { document: 'local-document', apiKey: 'local-conecty-key', token: 'local-conecty-token' }
 
-export function conectyCredentials () {
+export function conectyCredentials() {
   return {
     document: process.env.CONECTY_LOCAL_DOCUMENT || defaults.document,
     apiKey: process.env.CONECTY_LOCAL_API_KEY || defaults.apiKey,
@@ -14,11 +18,11 @@ export function conectyCredentials () {
 }
 
 // Mismo formato de error que Conecty: { success: false, response: { message } }
-export function conectyError (statusCode: number, message: string) {
+export function conectyError(statusCode: number, message: string) {
   return createError({ statusCode, message, data: { success: false, response: { message } } })
 }
 
-export function ensureConectyToken (event: Parameters<typeof getHeader>[0]) {
+export function ensureConectyToken(event: Parameters<typeof getHeader>[0]) {
   if (getHeader(event, 'authorization') !== `Bearer ${conectyCredentials().token}`) throw conectyError(401, 'Token inválido o expirado.')
 }
 
@@ -34,18 +38,28 @@ export const PACKAGES: ConectyPackage[] = [
   pkg(90006, 'Global 5 GB 30 días', 35, 'Global', 'Global', 'WW', 30, '5 GB', 'GLOBAL')
 ]
 
-declare global { var __conectyLocalSales: ConectySale[] | undefined }
-export const getSales = () => globalThis.__conectyLocalSales ??= []
-export const resetSales = () => { globalThis.__conectyLocalSales = []; return getSales() }
+export const getSales = async () => await getStore().list<ConectySale>('sales')
+export const findSale = async (id: string) => await getStore().get<ConectySale>('sales', id)
+const identifierKey = (identifier: string) => createHash('sha256').update(identifier).digest('hex')
+export const saleForIdentifier = async (identifier: string) => identifier ? await getStore().get<ConectySale>('saleIdentifiers', identifierKey(identifier)) : undefined
 
-export function createSale (packageId: number, identifier: string): ConectySale {
-  if (!Number.isInteger(packageId) || packageId <= 0) throw conectyError(404, `El paquete ${packageId} no existe.`)
-  const sale = { id: String(700000 + getSales().length + 1), identifier, packageId, createdAt: new Date().toISOString() }
-  getSales().push(sale)
-  return sale
+export async function createSale(packageId: number, identifier: string): Promise<ConectySale> {
+  const store = getStore()
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const existing = await saleForIdentifier(identifier)
+    if (existing) return existing
+    if (!Number.isInteger(packageId) || packageId <= 0) throw conectyError(404, `El paquete ${packageId} no existe.`)
+    const sale = { id: String(randomInt(100000000, 1000000000)), identifier, packageId, createdAt: new Date().toISOString() }
+    const entries: Entry[] = [{ collection: 'sales', key: sale.id, value: sale }]
+    // Both records are created in one transaction so concurrent retries of a
+    // sale_identifier return the same sale even on different Amplify instances.
+    if (identifier) entries.push({ collection: 'saleIdentifiers', key: identifierKey(identifier), value: sale })
+    if (await store.create(entries)) return sale
+  }
+  throw conectyError(409, 'No se pudo registrar la venta. Intenta nuevamente.')
 }
 
-export function saleDetail (sale: ConectySale) {
+export function saleDetail(sale: ConectySale) {
   // IDs fuera del catálogo local (p. ej. importados del catálogo real) se simulan con un paquete genérico
   const item = PACKAGES.find(candidate => candidate.intId === sale.packageId) ?? { intId: sale.packageId, plan: `Paquete ${sale.packageId} (simulado)` }
   const iccid = `8957000000${sale.id.padStart(9, '0')}`

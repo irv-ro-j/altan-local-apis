@@ -1,6 +1,6 @@
 # Altán Local APIs
 
-Simulador local, sin persistencia, para integrar el CRM con las operaciones principales de Altán sin realizar transacciones reales.
+Simulador de Altán y Conecty para integrar el CRM sin realizar transacciones reales. Admite persistencia compartida en DynamoDB y un modo descartable en memoria.
 
 ## Arranque
 
@@ -9,6 +9,36 @@ pnpm dev
 ```
 
 El portal y la API quedan disponibles en `http://localhost:3000`.
+
+## Persistencia en DynamoDB
+
+La tabla `altan-local-apis` está en `us-east-2` (Ohio), con capacidad provisionada de 5 RCU y 5 WCU. La infraestructura reproducible y los permisos están en [`infra/storage.yaml`](infra/storage.yaml); consulta [`infra/README.md`](infra/README.md) para configurar otra cuenta o entorno.
+
+Para usar la tabla desde tu equipo, copia `.env.example` a `.env` y utiliza el perfil AWS `altan-local-apis` configurado con el rol de desarrollo. No se guardan claves AWS en el repositorio. El namespace local es `local`; la rama `master` de Amplify utiliza `default`, de modo que reiniciar pruebas locales no borra los datos remotos.
+
+| Variable | Valor |
+| --- | --- |
+| `MOCK_STORAGE` | `dynamodb` para persistir; `memory` para pruebas descartables |
+| `DYNAMODB_TABLE` | `altan-local-apis` |
+| `DYNAMODB_REGION` | `us-east-2` |
+| `MOCK_NAMESPACE` | `local` en desarrollo; `default` en Amplify |
+| `AWS_PROFILE` | `altan-local-apis`, solamente en el equipo local |
+
+Amplify obtiene permisos del rol SSR Compute de la rama, sin claves estáticas. Las variables anteriores se leen durante el build; Nitro también admite los overrides de runtime `NUXT_MOCK_STORAGE`, `NUXT_DYNAMODB_TABLE`, `NUXT_DYNAMODB_REGION` y `NUXT_MOCK_NAMESPACE`. Los permisos y variables de Amplify pueden configurarse antes del despliegue; el cambio de memoria a DynamoDB se activa al desplegar este código.
+
+Cada SIM y venta se guarda individualmente. Las actualizaciones usan versiones y transacciones para evitar perder recargas concurrentes; la portabilidad mueve el registro entre números de forma atómica. Las ventas Conecty conservan la idempotencia de `sale_identifier` incluso entre instancias.
+
+Las fixtures se crean una sola vez por namespace. Reiniciar o desplegar no borra datos ni recrea una SIM cuyo número ya fue portado. `POST /api/mock/reset` cambia atómicamente a fixtures nuevas y borra SIM manuales, ventas y referencias de idempotencia del namespace actual. DynamoDB nunca hace fallback silencioso a memoria ante errores de conexión o permisos. `GET /api/mock/health` comprueba la conexión y devuelve el backend activo en `storage`.
+
+Pruebas sin AWS: `pnpm test`. Prueba de integración con la tabla real, después de `pnpm build`:
+
+```powershell
+$env:AWS_PROFILE = 'altan-local-apis'
+$env:TEST_DYNAMODB_TABLE = 'altan-local-apis'
+pnpm test:persistence
+```
+
+La prueba real usa un namespace `qa-smoke-<uuid>`, arranca dos procesos sucesivos, verifica persistencia y concurrencia y elimina sus propios registros al terminar. No resetea `default` ni `local`.
 
 ## Endpoints compatibles
 
@@ -42,7 +72,13 @@ El endpoint de token exige Basic Auth correcto. Las rutas operativas exigen el B
 | `5550000098` | Error 500 simulado |
 | `5550000099` | Perfil inexistente (404 / `1211000305`) |
 
-Los cambios se mantienen únicamente en memoria. Activación y preactivación cambian una SIM `Idle` a `Active`, asignan el plan principal y crean bolsas de 5,120 MB, 1,500 minutos y 500 SMS con vigencia de 30 días. Una compra agrega una bolsa de 1,024 MB con vigencia de 30 días. El cambio de plan reemplaza las bolsas del plan principal. Reinicia el proceso o llama a `POST /api/mock/reset` para volver al estado inicial.
+La consulta de perfil de cualquier SIM en estado `Deactive` devuelve HTTP `404` con `errorCode: "1211000305"` en la raíz del JSON. Así, el CRM obtiene `is_success = False` y entra al manejo de suscriptor inexistente o inactivo de `MSISDNProfileUseCase`. Puedes probarlo con `5550000011` o con una SIM creada manualmente en ese estado.
+
+La consulta de perfil solo lee el estado: un MSISDN no registrado también devuelve `404` / `1211000305` y no se crea automáticamente como `Active`. El autoprovisionamiento queda reservado a las operaciones válidas del simulador.
+
+Activación y preactivación cambian una SIM `Idle` a `Active`, asignan el plan principal y crean bolsas de 5,120 MB, 1,500 minutos y 500 SMS con vigencia de 30 días. Una compra agrega una bolsa de 1,024 MB con vigencia de 30 días. El cambio de plan reemplaza las bolsas del plan principal. Llama a `POST /api/mock/reset` para volver al estado inicial.
+
+Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al reiniciar o cambiar de instancia. En Amplify debe utilizarse `dynamodb` para compartir y conservar el estado.
 
 ## Utilidades propias del mock
 
@@ -71,4 +107,4 @@ El simulador también expone la Conecty Sales API. En el CRM, en `Integradores >
 | Detalle de venta (eSIM, QR, SM-DP+) | GET | `/api/sales?sale_id=` |
 | Buscar venta por referencia | GET | `/api/sales/history?sale_identifier=` |
 
-El catálogo trae 6 paquetes de ejemplo (IDs `90001`–`90006`). Las ventas viven en memoria; `GET /api/mock/conecty/sales` las lista y `POST /api/mock/reset` las borra.
+El catálogo trae 6 paquetes de ejemplo (IDs `90001`–`90006`). Las ventas usan el mismo backend de persistencia que las SIM; `GET /api/mock/conecty/sales` las lista y `POST /api/mock/reset` las borra.

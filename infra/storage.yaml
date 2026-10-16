@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Persistent simulator data and table-scoped access for Altan Local APIs.
+Parameters:
+  AmplifyAppId:
+    Type: String
+    Default: d35166z8sfi9mb
+  DeveloperPrincipalArn:
+    Type: String
+    Description: IAM user allowed to assume the local development role.
+Resources:
+  MockTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: altan-local-apis
+      TableClass: STANDARD
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: altan-local-apis
+        - Key: Environment
+          Value: simulator
+  TableAccess:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read and mutate simulator records only; cannot manage or delete tables.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:BatchWriteItem
+            Resource: !GetAtt MockTable.Arn
+  ComputeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Amplify SSR access to the simulator table.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: amplify.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:amplify:${AWS::Region}:${AWS::AccountId}:apps/${AmplifyAppId}*
+      ManagedPolicyArns:
+        - !Ref TableAccess
+  DeveloperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Local development access to the simulator table using an existing AWS profile.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref DeveloperPrincipalArn
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref TableAccess
+Outputs:
+  TableName:
+    Value: !Ref MockTable
+  ComputeRoleArn:
+    Value: !GetAtt ComputeRole.Arn
+  DeveloperRoleArn:
+    Value: !GetAtt DeveloperRole.Arn

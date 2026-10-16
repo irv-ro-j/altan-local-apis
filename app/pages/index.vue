@@ -10,8 +10,9 @@ const addError = ref('')
 async function addSims() {
   adding.value = true; addError.value = ''; addResult.value = null
   try {
-    addResult.value = await $fetch('/api/mock/sims', { method: 'POST', body: { msisdns: newMsisdns.value, status: newStatus.value } })
-    newMsisdns.value = [...addResult.value.skipped, ...addResult.value.invalid].join('\n')
+    const result = await $fetch<{ created: string[], skipped: string[], invalid: string[] }>('/api/mock/sims', { method: 'POST', body: { msisdns: newMsisdns.value, status: newStatus.value } })
+    addResult.value = result
+    newMsisdns.value = [...result.skipped, ...result.invalid].join('\n')
     await refresh()
   } catch (error: any) {
     addError.value = error?.data?.data?.message || error?.data?.message || 'No se pudieron agregar las SIMs.'

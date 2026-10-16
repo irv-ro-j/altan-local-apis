@@ -10,6 +10,12 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/main.css'],
+  runtimeConfig: {
+    mockStorage: process.env.MOCK_STORAGE || 'memory',
+    dynamodbTable: process.env.DYNAMODB_TABLE || '',
+    dynamodbRegion: process.env.DYNAMODB_REGION || 'us-east-2',
+    mockNamespace: process.env.MOCK_NAMESPACE || 'default'
+  },
 
   compatibilityDate: '2026-06-30',
 

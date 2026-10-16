@@ -1,4 +1,4 @@
-import { conectyError, conectyOk, createSale, ensureConectyToken, getSales } from '../../utils/conecty'
+import { conectyError, conectyOk, createSale, ensureConectyToken } from '../../utils/conecty'
 
 export default defineEventHandler(async (event) => {
   ensureConectyToken(event)
@@ -6,6 +6,5 @@ export default defineEventHandler(async (event) => {
   const product = body?.products?.[0]
   if (!product?.id) throw conectyError(400, 'products[0].id es requerido.')
   const identifier = body.sale_identifier || ''
-  const existing = identifier ? getSales().find(sale => sale.identifier === identifier) : undefined
-  return conectyOk({ id: (existing ?? createSale(Number(product.id), identifier)).id })
+  return conectyOk({ id: (await createSale(Number(product.id), identifier)).id })
 })
