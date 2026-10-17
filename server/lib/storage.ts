@@ -63,6 +63,17 @@ export class MockStore {
     throw new StorageConflictError('El registro cambió durante la operación. Intenta nuevamente.')
   }
 
+  async delete(collection: Collection, key: string): Promise<boolean> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const scope = await this.backend.scope()
+      const current = await this.backend.read(scope, collection, key)
+      if (!current) return false
+      if (await this.backend.commit(scope, [{ collection, key, revision: current.revision }])) return true
+      await delay(10 + Math.random() * 40 * (attempt + 1))
+    }
+    throw new StorageConflictError('El registro cambiÃ³ durante la operaciÃ³n. Intenta nuevamente.')
+  }
+
   async reset() { await this.backend.reset() }
   async ready() { await this.backend.scope() }
 }

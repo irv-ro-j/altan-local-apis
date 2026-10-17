@@ -90,6 +90,7 @@ Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al r
 
 - `GET /api/mock/health`
 - `GET /api/mock/sims`
+- `DELETE /api/mock/sims/{msisdn}` -- elimina una SIM del namespace actual; cada tarjeta incluye esta accion con confirmacion.
 - `POST /api/mock/sims/{msisdn}/consume` — consume 250 MB, 60 minutos y 20 SMS.
 - `POST /api/mock/reset`
 

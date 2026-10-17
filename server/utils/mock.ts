@@ -13,6 +13,9 @@ export async function addSim(msisdn: string, status: string) {
   const sim = manualSim(msisdn, status)
   return await getStore().create([{ collection: 'sims', key: msisdn, value: sim }]) ? sim : undefined
 }
+export async function removeSim(msisdn: string) {
+  return await getStore().delete('sims', msisdn)
+}
 
 // A profile lookup never provisions a SIM, including after a cold start.
 export async function findSim(msisdn: string) {

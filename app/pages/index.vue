@@ -22,9 +22,23 @@ const { data: conectyPackages } = await useFetch<{ intId: number, plan: string, 
 const { data: conectySales, refresh: refreshConectySales } = await useFetch<{ id: string, identifier: string, packageId: number, createdAt: string }[]>('/api/mock/conecty/sales')
 const copied = ref(false)
 const consuming = ref<string | null>(null)
+const removing = ref<string | null>(null)
+const removeError = ref<{ msisdn: string, message: string } | null>(null)
 async function copyBaseUrl() { await navigator.clipboard.writeText('http://localhost:3000'); copied.value = true; setTimeout(() => { copied.value = false }, 1800) }
 async function resetFixtures() { await $fetch('/api/mock/reset', { method: 'POST' }); await Promise.all([refresh(), refreshConectySales()]) }
 async function consumeBalance(msisdn: string) { consuming.value = msisdn; try { await $fetch(`/api/mock/sims/${msisdn}/consume`, { method: 'POST' }); await refresh() } finally { consuming.value = null } }
+async function removeSim(msisdn: string) {
+  if (!window.confirm(`¿Eliminar la SIM ${msisdn}? Esta acción no se puede deshacer.`)) return
+  removing.value = msisdn
+  removeError.value = null
+  try {
+    await $fetch(`/api/mock/sims/${msisdn}`, { method: 'DELETE' })
+    await refresh()
+  } catch (error: unknown) {
+    const apiError = error as { data?: { data?: { message?: string }, message?: string } }
+    removeError.value = { msisdn, message: apiError.data?.data?.message || apiError.data?.message || 'No se pudo eliminar la SIM.' }
+  } finally { removing.value = null }
+}
 useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador local de operaciones Altán para CRM.' })
 </script>
 <template>
@@ -81,8 +95,33 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
         <div v-if="sim.benefitCount" class="balances"><span><b>{{ sim.balances.data }}</b>
             MB</span><span><b>{{ sim.balances.voice }}</b> min</span><span><b>{{ sim.balances.sms }}</b> SMS</span>
         </div>
-        <button v-if="sim.benefitCount" class="consume-button" type="button" :disabled="consuming === sim.msisdn"
-          @click="consumeBalance(sim.msisdn)">{{ consuming === sim.msisdn ? 'Consumiendo…' : 'Consumir saldo' }}</button>
+        <div class="sim-actions">
+          <button
+            v-if="sim.benefitCount"
+            class="consume-button"
+            type="button"
+            :disabled="consuming === sim.msisdn || removing === sim.msisdn"
+            @click="consumeBalance(sim.msisdn)"
+          >
+            {{ consuming === sim.msisdn ? 'Consumiendo…' : 'Consumir saldo' }}
+          </button>
+          <button
+            class="delete-button"
+            type="button"
+            :disabled="removing === sim.msisdn || consuming === sim.msisdn"
+            :aria-label="`Eliminar SIM ${sim.msisdn}`"
+            @click="removeSim(sim.msisdn)"
+          >
+            {{ removing === sim.msisdn ? 'Eliminando…' : 'Eliminar SIM' }}
+          </button>
+        </div>
+        <p
+          v-if="removeError?.msisdn === sim.msisdn"
+          class="remove-feedback"
+          role="alert"
+        >
+          {{ removeError.message }}
+        </p>
         <footer><span>Oferta {{ sim.offerId }}</span><span>{{ sim.iccid }}</span></footer>
       </article>
     </div>
@@ -201,5 +240,48 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
 
 .add-feedback.error {
   color: #b42318
+}
+
+.sim-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: auto 0 12px
+}
+
+.sim-actions .consume-button {
+  margin: 0
+}
+
+.delete-button {
+  border: 1px solid #e6b7b2;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff8f7;
+  color: #a12f27;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer
+}
+
+.delete-button:hover:not(:disabled) {
+  border-color: #c75b51;
+  background: #fff0ee
+}
+
+.delete-button:disabled {
+  opacity: .55;
+  cursor: wait
+}
+
+.remove-feedback {
+  margin: 0 0 10px;
+  color: #a12f27;
+  font-size: 12px
+}
+
+.sim-card footer {
+  margin-top: 0
 }
 </style>
