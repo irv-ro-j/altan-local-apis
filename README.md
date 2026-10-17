@@ -54,6 +54,12 @@ La prueba real usa un namespace `qa-smoke-<uuid>`, arranca dos procesos sucesivo
 
 El endpoint de token exige Basic Auth correcto. Las rutas operativas exigen el Bearer emitido. Copia `.env.example` a `.env` para cambiar los valores; si no existe `.env`, los valores predeterminados son `local-crm`, `local-secret-change-me` y `local-altan-access-token`.
 
+### Portabilidad entrante
+
+`POST /ac/v1/msisdns/port-in-c` recibe `msisdnTransitory` y `msisdnPorted` como cadenas de diez dígitos. Si la operación se acepta, responde HTTP `200` con `msisdnPorted` y `effectiveDate`, y mueve la SIM activa al número portado. Los errores de validación, conflicto o estado de SIM responden con su código HTTP y un objeto JSON `{ "errorCode": "...", "message": "..." }`. Esto permite que el CRM guarde la respuesta y el detalle en los campos JSON `response_data` y `response_errors` de `RequestLog`.
+
+Los números `5511119999` y `5599991111` en `msisdnTransitory` mantienen los escenarios controlados de error `400` y `500`. Una SIM transitoria no activa o un número portado ya ocupado produce un error JSON `409`.
+
 ## Escenarios de SIM
 
 | MSISDN | Estado inicial |
