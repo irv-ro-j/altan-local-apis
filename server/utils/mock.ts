@@ -3,14 +3,14 @@ import { manualSim, provisionSim, MSISDN_PATTERN } from '../lib/sim-data'
 import type { MockSim } from '../lib/sim-data'
 import { DuplicateKeyError, StorageConflictError } from '../lib/storage'
 
-export { activatePlan, changePlan, consumeBenefits, operationResult, profileFor, purchasePackage, setOfferLifecycleType, STATUS_OPTIONS, MSISDN_PATTERN } from '../lib/sim-data'
+export { activatePlan, changePlan, consumeBenefits, crtLinkageFor, operationResult, profileFor, purchasePackage, setOfferLifecycleType, STATUS_OPTIONS, MSISDN_PATTERN } from '../lib/sim-data'
 export type { MockSim, OfferLifecycleType } from '../lib/sim-data'
 
 export async function getSims() {
   return (await getStore().list<MockSim>('sims')).sort((a, b) => a.msisdn.localeCompare(b.msisdn))
 }
-export async function addSim(msisdn: string, status: string) {
-  const sim = manualSim(msisdn, status)
+export async function addSim(msisdn: string, status: string, isCrtLinked = false) {
+  const sim = manualSim(msisdn, status, isCrtLinked)
   return await getStore().create([{ collection: 'sims', key: msisdn, value: sim }]) ? sim : undefined
 }
 export async function removeSim(msisdn: string) {

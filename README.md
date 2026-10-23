@@ -46,6 +46,7 @@ La prueba real usa un namespace `qa-smoke-<uuid>`, arranca dos procesos sucesivo
 | --- | --- | --- |
 | Token | POST | `/v1/oauth/accesstoken` |
 | Perfil | GET | `/cm/v1/subscribers/{msisdn}/profile` |
+| Vinculación CRT | POST | `/cm/v1/subscribers/links` |
 | Activación | POST | `/cm/v1/subscribers/{msisdn}/activate` |
 | Preactivación | POST | `/cm/v1/subscribers/{msisdn}/preregistered` |
 | Compra/recarga | POST | `/cm/v1/products/purchase` |
@@ -60,12 +61,18 @@ El endpoint de token exige Basic Auth correcto. Las rutas operativas exigen el B
 
 Los números `5511119999` y `5599991111` en `msisdnTransitory` mantienen los escenarios controlados de error `400` y `500`. Una SIM transitoria no activa o un número portado ya ocupado produce un error JSON `409`.
 
+### Consulta de vinculación CRT
+
+`POST /cm/v1/subscribers/links` requiere Bearer Auth y recibe `{ "msisdn": "5550000002" }`. Devuelve HTTP `200` con `{ "isCrtLinked": true|false }`. El valor proviene de la SIM mock y no modifica el estado ni la respuesta del endpoint de perfil; el CRM puede consultar esta operación de forma independiente.
+
+Un MSISDN inválido responde `400`. Un suscriptor inexistente o desactivado responde `400` con `errorCode: "400"` y `detail: "The subscriber does not exist"`, para mantener la respuesta compatible con el manejo del endpoint de Altán. `5550000098` conserva el escenario de error `500`.
+
 ## Escenarios de SIM
 
-| MSISDN | Estado inicial |
-| --- | --- |
-| `5550000001` | Idle |
-| `5550000002` | Active |
+| MSISDN | Estado inicial | Vinculación CRT |
+| --- | --- | --- |
+| `5550000001` | Idle | No vinculada |
+| `5550000002` | Active | Vinculada |
 | `5550000003` | Suspend (B2W) |
 | `5550000004` | Suspend (B2W) (By IMEI locked) |
 | `5550000005` | Suspend (B2W) (Notified by client) |
@@ -90,6 +97,7 @@ Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al r
 
 - `GET /api/mock/health`
 - `GET /api/mock/sims`
+- `POST /api/mock/sims` acepta `isCrtLinked` (booleano opcional; predeterminado `false`) al crear SIMs manuales, para preparar escenarios vinculados y no vinculados.
 - `DELETE /api/mock/sims/{msisdn}` -- elimina una SIM del namespace actual; cada tarjeta incluye esta accion con confirmacion.
 - `POST /api/mock/sims/{msisdn}/consume` — consume 250 MB, 60 minutos y 20 SMS.
 - `POST /api/mock/reset`

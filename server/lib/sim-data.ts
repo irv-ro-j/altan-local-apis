@@ -1,5 +1,5 @@
 export type BenefitBucket = { name: string, offeringId: string, total: number, remaining: number, effectiveDate: string, expireDate: string }
-export type MockSim = { msisdn: string, iccid: string, imsi: string, imei: string, status: string, label: string, description: string, offerId: string, benefits: BenefitBucket[], operations: { type: string, at: string, offeringId?: string }[] }
+export type MockSim = { msisdn: string, iccid: string, imsi: string, imei: string, status: string, label: string, description: string, offerId: string, benefits: BenefitBucket[], operations: { type: string, at: string, offeringId?: string }[], isCrtLinked: boolean }
 const dateFormat = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 function dateInDays(days: number) {
   const date = new Date()
@@ -42,16 +42,16 @@ export function setOfferLifecycleType(sim: MockSim, type: OfferLifecycleType) {
 const initialSims: MockSim[] = [
   ['5550000001', 'Idle', 'Inactiva', 'SIM disponible para preactivar o activar'], ['5550000002', 'Active', 'Activa', 'Línea activa para recargas y cambio de plan'], ['5550000003', 'Suspend (B2W)', 'Suspendida', 'Línea suspendida'], ['5550000004', 'Suspend (B2W) (By IMEI locked)', 'Suspendida por IMEI', 'Línea suspendida por IMEI bloqueado'], ['5550000005', 'Suspend (B2W) (Notified by client)', 'Suspendida por cliente', 'Suspensión solicitada por cliente'], ['5550000006', 'Barring (B1W)', 'Restricción B1W', 'Restricción de llamadas y mensajes'], ['5550000007', 'Barring (B1W) (By NoB28)', 'Restricción NoB28', 'Restricción por no ser B28'], ['5550000008', 'Barring (B1W) (Notified by client)', 'Restricción por cliente', 'Restricción solicitada por cliente'], ['5550000009', 'Predeactive', 'Predesactivada v1', 'Línea predesactivada'], ['5550000010', 'Predeactivate', 'Predesactivada v2', 'Línea predesactivada sin servicio'], ['5550000011', 'Deactive', 'Desactivada', 'Línea desactivada']
   // Un Idle real de Altán sí trae offeringId (oferta base sin plan, ver RequestLog id 16107/15962/15559: siempre "1000001051") pero sin IMEI ni freeUnits
-].map(([msisdn, status, label, description], index) => ({ msisdn, status, label, description, iccid: `89521400000000000${String(index + 1).padStart(2, '0')}`, imsi: `3341400000000${String(index + 1).padStart(2, '0')}`, imei: status === 'Idle' ? '' : `3500000000000${String(index + 1).padStart(2, '0')}`, offerId: status === 'Idle' ? OFFER_CODES.IDLE : OFFER_CODES.MULTI, benefits: status === 'Active' ? primaryBenefits(OFFER_CODES.MULTI) : [], operations: [] })) as MockSim[]
+].map(([msisdn, status, label, description], index) => ({ msisdn, status, label, description, iccid: `89521400000000000${String(index + 1).padStart(2, '0')}`, imsi: `3341400000000${String(index + 1).padStart(2, '0')}`, imei: status === 'Idle' ? '' : `3500000000000${String(index + 1).padStart(2, '0')}`, offerId: status === 'Idle' ? OFFER_CODES.IDLE : OFFER_CODES.MULTI, benefits: status === 'Active' ? primaryBenefits(OFFER_CODES.MULTI) : [], operations: [], isCrtLinked: msisdn === '5550000002' })) as MockSim[]
 // Catálogo de estados disponibles, derivado de las fixtures para no duplicar status/label.
 export const STATUS_OPTIONS = initialSims.map(({ status, label, description }) => ({ status, label, description }))
 export const MSISDN_PATTERN = /^\d{10}$/
-export function manualSim(msisdn: string, status: string): MockSim {
+export function manualSim(msisdn: string, status: string, isCrtLinked = false): MockSim {
   const option = STATUS_OPTIONS.find(item => item.status === status)
   if (!option) throw createError({ statusCode: 400, data: { message: `Estado inválido: ${status}` } })
   const idle = status === 'Idle'
   const offerId = idle ? OFFER_CODES.IDLE : OFFER_CODES.MULTI
-  const sim: MockSim = { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: idle ? '' : `35${msisdn}0`, status, label: option.label, description: `${option.description} (alta manual)`, offerId, benefits: status === 'Active' ? primaryBenefits(offerId) : [], operations: [] }
+  const sim: MockSim = { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: idle ? '' : `35${msisdn}0`, status, label: option.label, description: `${option.description} (alta manual)`, offerId, benefits: status === 'Active' ? primaryBenefits(offerId) : [], operations: [], isCrtLinked }
   return sim
 }
 export function createInitialSims() {
@@ -60,10 +60,13 @@ export function createInitialSims() {
 // Cualquier MSISDN fuera de las fixtures se autoprovisiona en el status que la operación solicitada necesita (Idle para preactivar/activar, Active para recargar/cambiar plan/consumir), en vez de un status fijo que bloquee unas u otras.
 export function provisionSim(msisdn: string, status: 'Idle' | 'Active'): MockSim {
   if (status === 'Idle') {
-    return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: '', status: 'Idle', label: 'Inactiva', description: 'SIM autoprovisionada (LOCAL mock)', offerId: OFFER_CODES.IDLE, benefits: [], operations: [] }
+    return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: '', status: 'Idle', label: 'Inactiva', description: 'SIM autoprovisionada (LOCAL mock)', offerId: OFFER_CODES.IDLE, benefits: [], operations: [], isCrtLinked: false }
   }
   const offerId = OFFER_CODES.MULTI
-  return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: `35${msisdn}0`, status: 'Active', label: 'Activa', description: 'SIM autoprovisionada (LOCAL mock)', offerId, benefits: primaryBenefits(offerId), operations: [] }
+  return { msisdn, iccid: `895214${msisdn}`, imsi: `33414${msisdn}`, imei: `35${msisdn}0`, status: 'Active', label: 'Activa', description: 'SIM autoprovisionada (LOCAL mock)', offerId, benefits: primaryBenefits(offerId), operations: [], isCrtLinked: false }
+}
+export function crtLinkageFor(sim: Pick<MockSim, 'isCrtLinked'>) {
+  return { isCrtLinked: sim.isCrtLinked === true }
 }
 export function activatePlan(sim: MockSim, offeringId: string, operation: 'activate' | 'preregister') {
   sim.status = 'Active'
