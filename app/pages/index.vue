@@ -1,5 +1,5 @@
 <script setup lang="ts">
-type MockSim = { msisdn: string, iccid: string, status: string, label: string, offerId: string, description: string, benefitCount: number, balances: { data: number, voice: number, sms: number } }
+type MockSim = { msisdn: string, iccid: string, status: string, label: string, offerId: string, description: string, benefitCount: number, balances: { data: number, voice: number, sms: number }, isCrtLinked: boolean }
 const { data: sims, refresh } = await useFetch<MockSim[]>('/api/mock/sims')
 const { data: statuses } = await useFetch<{ status: string, label: string, description: string }[]>('/api/mock/statuses')
 const newMsisdns = ref('')
@@ -24,6 +24,25 @@ const copied = ref(false)
 const consuming = ref<string | null>(null)
 const removing = ref<string | null>(null)
 const removeError = ref<{ msisdn: string, message: string } | null>(null)
+const savingCrt = ref<Record<string, boolean>>({})
+const crtErrors = ref<Record<string, string>>({})
+async function setCrtLinkage(sim: MockSim, isCrtLinked: boolean) {
+  if (savingCrt.value[sim.msisdn]) return
+  savingCrt.value[sim.msisdn] = true
+  crtErrors.value[sim.msisdn] = ''
+  try {
+    const result = await $fetch<{ msisdn: string, isCrtLinked: boolean }>(`/api/mock/sims/${sim.msisdn}/crt-linkage`, {
+      method: 'POST',
+      body: { isCrtLinked }
+    })
+    sim.isCrtLinked = result.isCrtLinked
+  } catch (error: unknown) {
+    const apiError = error as { data?: { data?: { message?: string }, message?: string } }
+    crtErrors.value[sim.msisdn] = apiError.data?.data?.message || apiError.data?.message || 'No se pudo guardar la vinculación CRT. Intenta de nuevo.'
+  } finally {
+    savingCrt.value[sim.msisdn] = false
+  }
+}
 async function copyBaseUrl() { await navigator.clipboard.writeText('http://localhost:3000'); copied.value = true; setTimeout(() => { copied.value = false }, 1800) }
 async function resetFixtures() { await $fetch('/api/mock/reset', { method: 'POST' }); await Promise.all([refresh(), refreshConectySales()]) }
 async function consumeBalance(msisdn: string) { consuming.value = msisdn; try { await $fetch(`/api/mock/sims/${msisdn}/consume`, { method: 'POST' }); await refresh() } finally { consuming.value = null } }
@@ -92,6 +111,23 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
             :class="['status-dot', sim.status === 'Active' ? 'active' : '']" />{{ sim.label }}
         </div><code>{{ sim.msisdn }}</code>
         <p>{{ sim.description }}</p>
+        <div class="crt-control">
+          <USwitch
+            :model-value="sim.isCrtLinked === true"
+            :label="`Vinculación CRT: ${sim.isCrtLinked ? 'vinculada' : 'no vinculada'}`"
+            :aria-label="`Vinculación CRT de ${sim.msisdn}`"
+            :loading="savingCrt[sim.msisdn] === true"
+            :disabled="savingCrt[sim.msisdn] === true || removing === sim.msisdn"
+            @update:model-value="setCrtLinkage(sim, $event)"
+          />
+          <p
+            v-if="crtErrors[sim.msisdn]"
+            class="remove-feedback"
+            role="alert"
+          >
+            {{ crtErrors[sim.msisdn] }}
+          </p>
+        </div>
         <div v-if="sim.benefitCount" class="balances"><span><b>{{ sim.balances.data }}</b>
             MB</span><span><b>{{ sim.balances.voice }}</b> min</span><span><b>{{ sim.balances.sms }}</b> SMS</span>
         </div>
@@ -108,7 +144,7 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
           <button
             class="delete-button"
             type="button"
-            :disabled="removing === sim.msisdn || consuming === sim.msisdn"
+            :disabled="removing === sim.msisdn || consuming === sim.msisdn || savingCrt[sim.msisdn] === true"
             :aria-label="`Eliminar SIM ${sim.msisdn}`"
             @click="removeSim(sim.msisdn)"
           >
@@ -248,6 +284,10 @@ useSeoMeta({ title: 'Altán local · API simulator', description: 'Simulador loc
   gap: 8px;
   flex-wrap: wrap;
   margin: auto 0 12px
+}
+
+.crt-control {
+  margin: 4px 0 14px;
 }
 
 .sim-actions .consume-button {

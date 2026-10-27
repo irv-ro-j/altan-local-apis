@@ -67,6 +67,8 @@ Los números `5511119999` y `5599991111` en `msisdnTransitory` mantienen los esc
 
 Un MSISDN inválido responde `400`. Un suscriptor inexistente o desactivado responde `400` con `errorCode: "400"` y `detail: "The subscriber does not exist"`, para mantener la respuesta compatible con el manejo del endpoint de Altán. `5550000098` conserva el escenario de error `500`.
 
+Cada tarjeta de SIM incluye un switch **Vinculación CRT** para vincular o desvincular la línea del simulador. El cambio se guarda en el backend configurado y se refleja en la consulta CRT, sin cambiar el estado operativo, la oferta ni las bolsas. Si falla el guardado, se conserva el valor anterior y la tarjeta muestra el error. Una SIM `Deactive` sigue respondiendo como suscriptor inexistente en la consulta de Altán, independientemente del valor del switch.
+
 ## Escenarios de SIM
 
 | MSISDN | Estado inicial | Vinculación CRT |
@@ -98,6 +100,7 @@ Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al r
 - `GET /api/mock/health`
 - `GET /api/mock/sims`
 - `POST /api/mock/sims` acepta `isCrtLinked` (booleano opcional; predeterminado `false`) al crear SIMs manuales, para preparar escenarios vinculados y no vinculados.
+- `POST /api/mock/sims/{msisdn}/crt-linkage` recibe `{ "isCrtLinked": true|false }` y devuelve `{ "msisdn": "...", "isCrtLinked": true|false }`. Solo modifica SIMs existentes; responde `400` si el número o el booleano son inválidos, `404` si la SIM no existe y `409` si se agotan los reintentos por cambios concurrentes.
 - `DELETE /api/mock/sims/{msisdn}` -- elimina una SIM del namespace actual; cada tarjeta incluye esta accion con confirmacion.
 - `POST /api/mock/sims/{msisdn}/consume` — consume 250 MB, 60 minutos y 20 SMS.
 - `POST /api/mock/reset`
