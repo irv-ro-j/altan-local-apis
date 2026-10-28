@@ -49,6 +49,7 @@ La prueba real usa un namespace `qa-smoke-<uuid>`, arranca dos procesos sucesivo
 | Vinculación CRT | POST | `/cm/v1/subscribers/links` |
 | Activación | POST | `/cm/v1/subscribers/{msisdn}/activate` |
 | Preactivación | POST | `/cm/v1/subscribers/{msisdn}/preregistered` |
+| Preactivación batch | POST | `/cm/v1/subscribers/preregistrations` |
 | Compra/recarga | POST | `/cm/v1/products/purchase` |
 | Cambio de plan | PATCH | `/cm/v1/subscribers/{msisdn}` |
 | Portabilidad entrante | POST | `/ac/v1/msisdns/port-in-c` |
@@ -95,6 +96,25 @@ Activación y preactivación cambian una SIM `Idle` a `Active`, asignan el plan 
 
 Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al reiniciar o cambiar de instancia. En Amplify debe utilizarse `dynamodb` para compartir y conservar el estado.
 
+### Preactivación batch
+
+`POST /cm/v1/subscribers/preregistrations` requiere el Bearer local y recibe `multipart/form-data` con el archivo en el campo `archivos[]` (también acepta `archivos`). Cada línea tiene el formato `msisdn|offeringId|Coordenadas(opcional)|msisdnPorted(opcional)|idPoS(opcional)`; los campos opcionales vacíos intermedios se envían vacíos (`5532689574|1001000019||5528964875|9999`) y las líneas vacías se ignoran. Límite: 10,000 líneas o 10 MB.
+
+Si el archivo se acepta responde HTTP `200` con el formato de Altán:
+
+```json
+{ "effectiveDate": "20261028142218", "lines": "3", "transaction": { "id": "1436386039896795" } }
+```
+
+Cada línea se procesa con la misma regla que la preactivación individual: una SIM `Idle` (o un MSISDN autoprovisionado) pasa a `Active` con el plan indicado; una SIM en otro estado no se modifica. Como en Altán, la respuesta no informa el resultado por línea: consúltalo en `GET /api/mock/preregistrations/{transactionId}` o en el perfil de cada SIM.
+
+| Escenario | Respuesta |
+| --- | --- |
+| Sin archivo | `400` `{ "errorCode": "400", "description": "The file was not found. Please check it" }` |
+| Línea con formato inválido, archivo vacío o fuera de límites | `400` con `description` indicando la línea; no se procesa ninguna línea. |
+| El archivo incluye `5550000098` | `500` con `errorCode`, `description` y `detail`; no se procesa ninguna línea. |
+| El archivo incluye `5550000097` | `200`, pero `lines` reporta una línea menos de las recibidas (el CRM debe marcar el lote como resultado incierto). |
+
 ## Utilidades propias del mock
 
 - `GET /api/mock/health`
@@ -103,6 +123,8 @@ Con `MOCK_STORAGE=memory`, los cambios siguen siendo efímeros y se pierden al r
 - `POST /api/mock/sims/{msisdn}/crt-linkage` recibe `{ "isCrtLinked": true|false }` y devuelve `{ "msisdn": "...", "isCrtLinked": true|false }`. Solo modifica SIMs existentes; responde `400` si el número o el booleano son inválidos, `404` si la SIM no existe y `409` si se agotan los reintentos por cambios concurrentes.
 - `DELETE /api/mock/sims/{msisdn}` -- elimina una SIM del namespace actual; cada tarjeta incluye esta accion con confirmacion.
 - `POST /api/mock/sims/{msisdn}/consume` — consume 250 MB, 60 minutos y 20 SMS.
+- `GET /api/mock/preregistrations` — lotes de preactivación batch recibidos (más recientes primero).
+- `GET /api/mock/preregistrations/{transactionId}` — conteos del lote y líneas fallidas con su motivo (se guardan hasta 500; `failuresTruncated` indica si hubo más). `POST /api/mock/reset` también los borra.
 - `POST /api/mock/reset`
 
 ## Uso desde CRM

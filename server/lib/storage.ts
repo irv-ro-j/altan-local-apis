@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { BatchWriteCommand, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb'
 import type { DynamoDBDocumentClient, QueryCommandOutput } from '@aws-sdk/lib-dynamodb'
 
-export type Collection = 'sims' | 'sales' | 'saleIdentifiers'
+export type Collection = 'sims' | 'sales' | 'saleIdentifiers' | 'preregistrationBatches'
 export type Entry = { collection: Collection, key: string, value: unknown }
 type Document = { value: unknown, revision: number }
 type Write = { collection: Collection, key: string, value?: unknown, revision: number | null }
@@ -193,7 +193,7 @@ export class DynamoBackend implements Backend {
   }
 
   private async clean(scope: string) {
-    for (const collection of ['sims', 'sales', 'saleIdentifiers'] as const) {
+    for (const collection of ['sims', 'sales', 'saleIdentifiers', 'preregistrationBatches'] as const) {
       const items = await this.items(scope, collection)
       for (let offset = 0; offset < items.length; offset += 25) {
         let requests = items.slice(offset, offset + 25).map(item => ({ DeleteRequest: { Key: { pk: item.pk, sk: item.sk } } }))
