@@ -1,5 +1,5 @@
 export type BenefitBucket = { name: string, offeringId: string, total: number, remaining: number, effectiveDate: string, expireDate: string }
-export type MockSim = { msisdn: string, iccid: string, imsi: string, imei: string, status: string, label: string, description: string, offerId: string, benefits: BenefitBucket[], operations: { type: string, at: string, offeringId?: string }[], isCrtLinked: boolean }
+export type MockSim = { msisdn: string, iccid: string, imsi: string, imei: string, status: string, label: string, description: string, offerId: string, benefits: BenefitBucket[], operations: { type: string, at: string, offeringId?: string, oldMsisdn?: string, newMsisdn?: string, zone?: string, msisdnType?: string }[], isCrtLinked: boolean }
 const dateFormat = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 function dateInDays(days: number) {
   const date = new Date()
@@ -82,6 +82,12 @@ export function changePlan(sim: MockSim, offeringId: string) {
   sim.offerId = offeringId
   sim.benefits = primaryBenefits(offeringId)
   sim.operations.push({ type: 'change_offer', offeringId, at: dateFormat(new Date()) })
+}
+export function changeSubscriberNumber(sim: MockSim, zone: string, msisdnType: string, newMsisdn: string) {
+  if (sim.status !== 'Active') throw createError({ statusCode: 409, data: { errorCode: 'LOCAL_NIR_NOT_ACTIVE', message: 'NIR changes require an Active SIM.' } })
+  const oldMsisdn = sim.msisdn
+  sim.msisdn = newMsisdn
+  sim.operations.push({ type: 'change_nir', oldMsisdn, newMsisdn, zone, msisdnType, at: dateFormat(new Date()) })
 }
 export function consumeBenefits(sim: MockSim, usage = { data: 250, voice: 60, sms: 20 }) {
   const kinds = [{ marker: 'DATA', amount: usage.data }, { marker: 'MIN', amount: usage.voice }, { marker: 'SMS', amount: usage.sms }]

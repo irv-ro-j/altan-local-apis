@@ -52,9 +52,35 @@ La prueba real usa un namespace `qa-smoke-<uuid>`, arranca dos procesos sucesivo
 | Preactivación batch | POST | `/cm/v1/subscribers/preregistrations` |
 | Compra/recarga | POST | `/cm/v1/products/purchase` |
 | Cambio de plan | PATCH | `/cm/v1/subscribers/{msisdn}` |
+| Cambio de zona/NIR | PATCH | `/cm/v1/subscribers/{msisdn}` |
 | Portabilidad entrante | POST | `/ac/v1/msisdns/port-in-c` |
 
 El endpoint de token exige Basic Auth correcto. Las rutas operativas exigen el Bearer emitido. Copia `.env.example` a `.env` para cambiar los valores; si no existe `.env`, los valores predeterminados son `local-crm`, `local-secret-change-me` y `local-altan-access-token`.
+
+### Cambio de zona/NIR
+
+`PATCH /cm/v1/subscribers/{msisdn}` distingue el contrato de cambio de plan
+(`primaryOffering.offeringId`) del cambio de NIR:
+
+```json
+{ "changeSubscriberMSISDN": { "zone": "3", "msisdnType": "1" } }
+```
+
+Acepta zonas `"2"` a `"9"` y `msisdnType` de uno o dos dígitos como cadena.
+Responde HTTP `200`, sin wrapper, con:
+
+```json
+{ "oldMsisdn": "5550000002", "newMsisdn": "3123456789" }
+```
+
+El nuevo número mock tiene diez dígitos, empieza por la zona y difiere del anterior;
+no representa una lada real. La SIM se mueve atómicamente al nuevo MSISDN,
+conservando ICCID, IMSI, estado CRT, oferta y bolsas. Registra `change_nir` con
+origen, destino, zona y tipo. El perfil del número anterior deja de existir.
+Las SIMs registradas deben estar `Active`; números desconocidos conservan el
+autoprovisionamiento del simulador. Payloads inválidos o con ambos contratos
+responden `400`; estado no activo o destino ocupado, `409`. Se conservan los
+escenarios `5550000098` (`500`) y `5550000099` (`404`).
 
 ### Portabilidad entrante
 
